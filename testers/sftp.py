@@ -3,12 +3,9 @@ from testers.base import CommandBuilder, Args
 class SFTPCommand(CommandBuilder):
     def __init__(self, extra_common=[]):
         program = '/usr/bin/sftp'
-        common_args = ['-B'] + extra_common
+        common_args = extra_common
         test_args = [
-                    Args(['-oCipher', 'blowfish'], 'blowfish'),
-                    Args(['-oCipher', 'blowfish', '-C'], 'blowfish', 'on'),
-                    Args(['-oCipher', '3des'], '3des'),
-                    Args(['-oCipher', '3des', '-C'], '3des', 'on'),
+                    Args(['-b', 'sftpbatch']),
                     ]
         cmd_format = ("%(base_command)s %(common_args)s "
                         "%(test_args)s %(file_args)s")
@@ -36,15 +33,13 @@ class SFTPCommand(CommandBuilder):
         self.fetch = False
     def build(self):
         if self.username is not None:
-            target = '%s@%s:%s%%(filename)s' % (self.username, 
-                                                self.host, 
-                                                self.target_folder)
+            target = '%s@%s' % (self.username, self.host)
         else:   
-            target = '%s:%s%%(filename)s' % (self.host, self.target_folder)
+            target = '%s' % self.host
         if self.fetch:
             file_args = [target, "%(filelocation)s"]
         else:
             file_args = ["%(filelocation)s", target]
-        file_format = " ".join(file_args)
+        file_format = target
         self.set_file_format(file_format)
         super(SFTPCommand, self).build()
