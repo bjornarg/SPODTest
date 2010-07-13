@@ -2,6 +2,7 @@ import timer
 import subprocess
 import os
 import StringIO
+import re
 
 class TestCase(object):
     """Abstract class that implements an interface for different test types.
@@ -107,7 +108,7 @@ class CommandBuilder(object):
 
 class Command(object):
     def __init__(self, command, command_name, args):
-        self.command = command
+        self.command = re.sub(r"\s+", " ", command).strip()
         self.command_name = command_name
         self.args = args
     def __str__(self):
