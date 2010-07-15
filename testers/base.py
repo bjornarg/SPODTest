@@ -3,63 +3,55 @@ import subprocess
 import os
 import StringIO
 import re
+import logging
 
 class TestCase(object):
     """Abstract class that implements an interface for different test types.
 
     """
-    def __init__(self, command, legal_return_values=None, file_set=None):
+    def __init__(self, command, f, legal_return_values=None):
         """Initializes a the test case with certain command.
 
         @param command: Command to be run.
         @type command: L{Command}
+        @param f: The file/folder to be sent.
+        @type f: L{FileObject}
         @param legal_return_values: The legal values the program can return,
                                     any values other than these will result in
                                     a L{IllegalReturnValueError} being raised.
         @type legal_return_values: list, tuple
-        @param file_set: The set of files to be sent.
-        @type file_set: L{FileSet}
         
         """
         self.timer = timer.Timer()
         self.command = command
-        if file_set is None:
-            self.file_set = FileSet()
-        else:
-            self.file_set = file_set
+        self.f = f
         if legal_return_values is None:
             self.legal_return_values = (0,)
         else:
             self.legal_return_values = legal_return_values
 
     def run(self):
-        """Runs the test set.
+        """Runs the test case.
 
-        Can raise an L{IllegalReturnValueError}.
+        Can raise an L{IllegalReturnValueError} if the command run does not 
+        return a value in I{self.legal_return_values}. This serves as a 
+        warning in case the program executed fails for some reason.
 
         """
-        print "Running %s" % self.command
-        print " ".join(self.command.get_command_list())
-        cmds = []
-        for f in self.file_set.files:
-            cmds.append((self.command.get_command_list(f), f.get_times()))
-        ps = []
+        logging.debug("Starting command: %s" % self.command.get_command(self.f))
+        cmd = self.command.get_command_list(self.f)
         self.timer.start()
-        for cmd in cmds:
-            for i in xrange(cmd[1]):
-                p = subprocess.call(cmd[0])
-                #p = subprocess.call(cmd[0], stdout=subprocess.PIPE)
-                ps.append(p)
+        p = subprocess.call(cmd)
+        print cmd
         self.timer.stop()
-        for i, p in enumerate(ps):
-            if p not in self.legal_return_values:
-                raise IllegalReturnValueError(('command %s returned an illegal '
-                                    'value: %d') % (cmds[i][0], p))
+        if p not in self.legal_return_values:
+            raise IllegalReturnValueError(('command %s returned an illegal '
+                                'value: %d') % (cmd, p))
     
     def get_timer(self):
         """Gets the timer for the test case.
 
-        @return: L{Timer}
+        @return: L{Timer} instance for this test case.
 
         """
         return self.timer
@@ -69,12 +61,14 @@ class TestCase(object):
         @return: float represetning the bytes passed per second.
 
         """
-        return float(self.file_set.get_size())/self.timer.get_processing_time()
+        return float(self.f.get_size())/self.timer.get_processing_time()
     def get_speed_string(self):
         """Gets a string representation of the speed for the test case.
 
         String is on the form::
+
             D.DDYB/s
+
         where D.DD is a float and Y is a unit, either G, M, k or nothing, 
         representing giga, mega, kilo and nothing, respectively.
 
@@ -104,24 +98,70 @@ class TestSet(object):
 
     """
     def __init__(self):
+        """Initializes an empty test set.
+        """
         self.test_cases = []
     def add_test_case(self, test_case):
+        """Adds a test case to the test set.
+
+        @param test_case: test case to be added to set.
+        @type test_case: L{TestCase}
+        @return: bool indicating whether test case was succesfully added.
+
+        """
         if isinstance(test_case, TestCase):
             self.test_cases.append(test_case)
             return True
         else:
             return False
     def get_test_cases(self):
+        """Gets the test cases in this test set.
+
+        @return: list of L{TestCase}
+
+        """
         return self.test_cases
     def run(self):
+        """Runs the test cases in this test set.
+
+        Loops through each test case and runs it's L{run<TestCase.run>} 
+        function.
+
+        """
         for test_case in self.test_cases:
             test_case.run()
 
 class CommandBuilder(object):
-    """Abstract class definint useful stuff for 
+    """Abstract class defining useful stuff for creating a test set from a
+    certain command.
+
     """
-    def __init__(self, name, base_cmd, cmd_format, common_args=[], 
-            test_args=None, file_format=None):
+    def __init__(self, name, base_cmd, cmd_format, cfgname, config, 
+            common_args=[], test_args=None, file_format=None):
+        """Initializes a command builder and sets some common class arguments.
+
+        @param name: Name of this command type
+        @type name: string
+        @param base_cmd: The shell command to be executed
+        @type base_cmd: string
+        @param cmd_format: Format of the string to be executed.
+        @type cmd_format: string
+        @param cfgname: Name of the current testset in the config.
+        @type cfgname: string
+        @param config: Configuration object.
+        @type config: U{ConfigParser.SafeConfigParser<http://docs.python.org
+                      /library/configparser.html#safeconfigparser-objects>}
+        @param common_args: Common arguments passed to all instances 
+                            of this command
+        @type common_args: list
+        @param test_args: List of test arguments run for this command
+        @type test_args: list of L{Args}
+        @param file_format: Method of formatting files for this command.
+        @type file_format: string
+
+        """
+        self.cfgname = cfgname
+        self.config = config
         self.name = name
         self.base_cmd = base_cmd
         self.cmd_format = cmd_format
@@ -132,12 +172,28 @@ class CommandBuilder(object):
             self.test_args = test_args
         self.file_format = file_format
         self.commands = []
-    def set_file_format(self, file_format):
-        """Sets the format for the files. 
+        self.files = []
+        files = config.get(cfgname, 'files').split(",")
+        for f in files:
+            self.files.append(self.build_file(f.strip()))
+    def build_file(self, f):
+        """Creates a L{FileObject} from I{f}.
+
+        @param f: Location of a file or folder.
+        @type f: string
+        @return: L{FileObject} representation of I{f}
 
         """
-        self.file_format = file_format
+        return FileObject(f)
     def build(self):
+        """Builds the commands.
+
+        Populates I{self.commands} with a list of L{Command} instances for
+        each L{Args} in I{self.test_args}.
+
+        Creates command based on I{self.cmd_format}.
+
+        """
         self.commands = []
         for test_arg in self.test_args:
             formatdata = {
@@ -150,32 +206,99 @@ class CommandBuilder(object):
             self.commands.append(Command(command=cmd, 
                                     command_name=self.name, 
                                     args=test_arg))
-    def build_test_set(self, file_set=None):
+    def build_test_set(self):
+        """Builds a test set from the list of commands.
+
+        Runs L{self.build<CommandBuilder.build>} to populate I{self.commands}.
+        
+        @return: L{TestSet} with a L{TestCase} for each command in 
+        I{self.commands} and file in I{self.files}.
+
+        """
         self.build()
         test_set = TestSet()
         for command in self.commands:
-            test_set.add_test_case(TestCase(command=command, file_set=file_set))
+            for f in self.files:
+                test_set.add_test_case(TestCase(command=command, f=f))
         return test_set
 
+
 class Command(object):
+    """Object representing a command to be run.
+
+    """
     def __init__(self, command, command_name, args):
+        """Initializes the command with the command itself and list of 
+        arguments used for this command.
+
+        @param command: command to be run
+        @type command: string
+        @param command_name: Name of command (sftp, scp etc)
+        @type command_name: string
+        @param args: list of arguments used to create I{command}.
+        @type args: list of L{Args}
+
+        """
         self.command = re.sub(r"\s+", " ", command).strip()
         self.command_name = command_name
         self.args = args
     def __str__(self):
+        """Returns a string representation of L{Command}.
+
+        """
         return "%s(%s)" % (self.command_name, self.args.get_name())
     def get_command(self, f=None):
+        """Gets the command ready for execution.
+
+        If I{f} is a L{FileObject}, uses L{get_dict()<FileObject.get_dict>} to 
+        get a dictionary representation of L{FileObject} and replaces arguments 
+        in command with these to send the correct file.
+
+        @param f: Representation of file to be sent.
+        @type f: dict, L{FileObject}
+        @return: string
+
+        """
         if isinstance(f, dict):
             return self.command % f
         if isinstance(f, FileObject):
             return self.command % f.get_dict()
         return self.command
     def get_command_list(self, f=None):
+        """Gets the command in list form, as subprocess prefers this.
+
+        Uses L{self.get_command()<Command.get_command>} to fetch the 
+        command.
+
+        @param f: file to be sent
+        @type f: dict, L{FileObject}
+        @return: list
+
+        """
         return self.get_command(f).split(" ")
 
 
 class FileObject(object):
-    def __init__(self, name, times=1, size=None):
+    """Class representing a file and other necessary data about it.
+    
+    >>> import sys
+    >>> import os
+    >>> filepath = os.path.abspath(sys.argv[0])
+    >>> fo = FileObject(name=filepath)
+    >>> foo = FileObject(name=fo.get_dir(), size=30, num_files=2)
+    >>> fo.is_dir()
+    False
+    >>> foo.is_dir()
+    True
+    >>> fo.get_num_files()
+    1
+    >>> foo.get_num_files()
+    2
+    >>> foo.get_size()
+    30
+
+    """
+    def __init__(self, name, size=None, num_files=None, usage_file=None):
         self.abspath = os.path.abspath(name)
         if os.path.isdir(self.abspath):
             self.name = ''
@@ -183,8 +306,9 @@ class FileObject(object):
         else:
             self.name = os.path.basename(self.abspath)
             self.directory = os.path.dirname(self.abspath)
-        self.times = times
         self.size = size
+        self.num_files = num_files
+        self.usage_file = usage_file
     def get_path(self):
         """Gets location of file.
 
@@ -193,10 +317,26 @@ class FileObject(object):
 
         """
         return self.abspath
+    def __str__(self):
+        return "File: %s" % self.abspath
     def get_name(self):
-        """Gets the name of the file itself. """
+        """Gets the name of the file itself. 
+        
+        If this is a directory, should return an empty string.
+
+        @return: string
+
+        """
         return self.name
     def get_dir(self):
+        """Gets the directory of this file.
+
+        If this is a directory, should return the same as 
+        L{get_path()<FileObject.get_path>}.
+
+        @return: string
+
+        """
         return self.directory
     def get_size(self):
         """Gets the size of the file.
@@ -209,23 +349,13 @@ class FileObject(object):
         """
         if self.size is not None:
             return self.size
-        if os.path.isdir(self.abspath):
-            size = 0
-            for (path, dirs, files) in os.walk(self.abspath):
-                size += sum(os.path.getsize(os.path.join(path, f)) for f in files)
-            self.size = size
-            return size
-        try:
-            size = os.path.getsize(self.abspath)
-        except OSError, oserr:
-            print "Unable to open file \"%s\"" % self.abspath
-            return None
-        else:
-            self.size = size
-            return size
-    def get_times(self):
-        """Gets the number of times the file should be sent/retrieved. """
-        return self.times
+        fi = self.get_file_info(self.abspath)
+        self.size = fi['size']
+        if self.num_files is None:
+            self.num_files = fi['num']
+        return self.size
+    def set_usage_file(self, f):
+        self.usage_file = f
     def get_dict(self):
         """Gets a dictionary representation of the file.
         
@@ -234,40 +364,21 @@ class FileObject(object):
                  respectively.
         
         """
-        retdict = {'filename': self.name, 'filelocation': self.abspath, 'filedir': self.directory}
+        retdict = {'filename': self.name, 
+                        'filelocation': self.abspath, 
+                        'filedir': self.directory, 
+                        'usagefile': self.usage_file}
         return retdict
     def is_dir(self):
         return os.path.isdir(self.abspath)
-
-class FileSet(object):
-    def __init__(self):
-        self.files = []
-    def add_file(self, *args):
-        """Adds a file to the file set.
-
-        """
-        files = []
-        for f in args:
-            if isinstance(f, FileObject):
-                files.append(f)
-            else:
-                return False
-        self.files.extend(files)
-        return False
-    def get_size(self):
-        """Gets the total size of the files in the set.
-
-        @return: int if all files have a set size, returns False if any file 
-                 in set is missing a size.
-        """
-        total_size = 0
-        for f in self.files:
-            fs = f.get_size()
-            if fs is not None:
-                total_size += fs*f.get_times()
-            else:
-                return False
-        return total_size
+    def get_num_files(self):
+        if self.num_files is not None:
+            return self.num_files
+        fi = self.get_file_info(self.abspath)
+        if self.size is None:
+            self.size = fi['size']
+        self.num_files = fi['num']
+        return self.num_files
     def get_size_string(self):
         total_size = float(self.get_size())
         if total_size > 1024*1024*1024:
@@ -278,15 +389,39 @@ class FileSet(object):
             return "%.2fkB" % round(total_size/(1024*1024), 2)
         else:
             return "%.2fB" % round(total_size, 2)
-    def get_num_files(self):
-        return len(self.files)
+    @staticmethod
+    def get_file_info(filepath):
+        """Gets the size of a file/directory and the number of files.
+
+        The number of files will always be 1 if I{filepath} points to a file.
+
+        @param filepath: Path to a file or directory
+        @type filepath: string
+        @return: dict with the keys I{size} and I{num}, containing the size of 
+                 file or directory, and the number of files.
+
+        """
+        if not os.path.isdir(filepath):
+            return {'size': os.path.getsize(filepath), 'num': 1}
+        size = 0
+        num = 0
+        for (path, dirs, files) in os.walk(filepath):
+            size += sum(os.path.getsize(os.path.join(path, f)) for f in files)
+            num += len(files)
+        return {'size': size, 'num': num}
+        
+
 
 class Args(object):
-    NOTSET = "NOTSET"
+    """Class defining arguments for a command.
+
+    In addition to defining what types
+    """
+    NOTSET = "default"
     def __init__(self, args, encryption=None, 
                     compression=None, compression_level=None):
         if encryption is None:
-            encrypytion = self.NOTSET
+            encryption = self.NOTSET
         if compression is None:
             compression = self.NOTSET
         if compression_level is None:
@@ -311,6 +446,7 @@ class Args(object):
                                             self.compression_level)
 
 class Error(Exception):
+    """Base class for testers errors. """
     pass
 
 class AbstractError(Error):
