@@ -4,6 +4,7 @@ import os
 import StringIO
 import re
 import logging
+import shlex
 
 class TestCase(object):
     """Abstract class that implements an interface for different test types.
@@ -39,9 +40,9 @@ class TestCase(object):
 
         """
         logging.debug("Starting command: %s" % self.command.get_command(self.f))
-        cmd = self.command.get_command_list(self.f)
+        cmd = self.command.get_command(self.f)
         self.timer.start()
-        p = subprocess.call(cmd)
+        p = subprocess.call(cmd, shell=True, stdout=subprocess.PIPE)
         print cmd
         self.timer.stop()
         if p not in self.legal_return_values:
@@ -239,7 +240,7 @@ class Command(object):
         @type args: list of L{Args}
 
         """
-        self.command = re.sub(r"\s+", " ", command).strip()
+        self.command = command.strip()
         self.command_name = command_name
         self.args = args
     def __str__(self):
@@ -275,7 +276,7 @@ class Command(object):
         @return: list
 
         """
-        return self.get_command(f).split(" ")
+        return shlex.split(self.get_command(f))
 
 
 class FileObject(object):
@@ -415,7 +416,11 @@ class FileObject(object):
 class Args(object):
     """Class defining arguments for a command.
 
-    In addition to defining what types
+    Keeps track of the arguments and types of arguments set for a command.
+    This would show whether a command uses a certain encryption, compression 
+    and compression level. If either of them is not sent, it assumes the 
+    program uses the default encryption/compression/compression_level.
+
     """
     NOTSET = "default"
     def __init__(self, args, encryption=None, 
