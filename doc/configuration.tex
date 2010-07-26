@@ -1,0 +1,16 @@
+\section{Configuration}
+\gls{spodtest} uses the configuration file \verb@spodconf.cfg@, which is an INI
+formatted configuration file. The configuration file defines what tests are
+run.
+
+The tests are defined by the \verb@tests@ parameter in the \verb@spod@ section.
+The value of this key should be a comma separated list of other sections in the
+same configuration file. 
+
+Each test section \textit{must} define the following keys
+
+\begin{description}
+    \item[type] The type of test to be run, this can be either: \verb@scp@,
+        \verb@sftp@ or \verb@rsync@.
+    \item[host] The host the test should run against.
+\end{description}
