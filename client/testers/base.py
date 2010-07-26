@@ -39,11 +39,10 @@ class TestCase(object):
         warning in case the program executed fails for some reason.
 
         """
-        logging.debug("Starting command: %s" % self.command.get_command(self.f))
         cmd = self.command.get_command(self.f)
+        logging.debug("Starting command: %s" % cmd)
         self.timer.start()
         p = subprocess.call(cmd, shell=True, stdout=subprocess.PIPE)
-        print cmd
         self.timer.stop()
         if p not in self.legal_return_values:
             raise IllegalReturnValueError(('command %s returned an illegal '
@@ -206,7 +205,8 @@ class CommandBuilder(object):
             cmd = self.cmd_format % formatdata
             self.commands.append(Command(command=cmd, 
                                     command_name=self.name, 
-                                    args=test_arg))
+                                    args=test_arg,
+                                    builder=self))
     def build_test_set(self):
         """Builds a test set from the list of commands.
 
@@ -228,7 +228,7 @@ class Command(object):
     """Object representing a command to be run.
 
     """
-    def __init__(self, command, command_name, args):
+    def __init__(self, command, command_name, args, builder):
         """Initializes the command with the command itself and list of 
         arguments used for this command.
 
@@ -243,6 +243,7 @@ class Command(object):
         self.command = command.strip()
         self.command_name = command_name
         self.args = args
+        self.builder = builder
     def __str__(self):
         """Returns a string representation of L{Command}.
 
@@ -277,6 +278,14 @@ class Command(object):
 
         """
         return shlex.split(self.get_command(f))
+    
+    def get_builder(self):
+        """Gets the builder class that created this command.
+
+        @return: L{CommandBuilder} instance used to create this command.
+
+        """
+        return self.builder
 
 
 class FileObject(object):
@@ -299,7 +308,8 @@ class FileObject(object):
     30
 
     """
-    def __init__(self, name, size=None, num_files=None, usage_file=None):
+    def __init__(self, name, size=None, num_files=None, usage_file=None, 
+                    fs_name=None):
         self.abspath = os.path.abspath(name)
         if os.path.isdir(self.abspath):
             self.name = ''
@@ -310,6 +320,7 @@ class FileObject(object):
         self.size = size
         self.num_files = num_files
         self.usage_file = usage_file
+        self.fs_name = fs_name
     def get_path(self):
         """Gets location of file.
 
@@ -319,6 +330,7 @@ class FileObject(object):
         """
         return self.abspath
     def __str__(self):
+        """String representation of object. """
         return "File: %s" % self.abspath
     def get_name(self):
         """Gets the name of the file itself. 
@@ -329,10 +341,31 @@ class FileObject(object):
 
         """
         return self.name
+    def get_fs_name(self):
+        """Gets the name of the file set.
+        
+        If the file is a directory, attempts to read the file C{fs_name} in 
+        the directory. If the file exists, uses the first line as the name 
+        of the file set.
+
+        @return: string
+
+        """
+        if self.fs_name is not None:
+            return self.fs_name
+        if not self.is_dir():
+            return None
+        try:
+            f = open(os.path.join(self.abspath, 'fs_name'), 'r')
+        except IOError, ioe:
+            return None
+        self.fs_name = f.readlines()[0].strip()
+        f.close()
+        return self.fs_name
     def get_dir(self):
         """Gets the directory of this file.
 
-        If this is a directory, should return the same as 
+        If this instance represents a directory, should return the same as 
         L{get_path()<FileObject.get_path>}.
 
         @return: string
