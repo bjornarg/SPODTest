@@ -34,7 +34,6 @@ class Timer(object):
                                 'started')
         self.end_time = time.time()
         self.processing_time += self.end_time - self.start_time
-        self.start_time = None
         self.end_time = None
     def get_processing_time(self):
         """Gets the processing time for the timer.
