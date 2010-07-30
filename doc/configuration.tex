@@ -5,12 +5,44 @@ run.
 
 The tests are defined by the \verb@tests@ parameter in the \verb@spod@ section.
 The value of this key should be a comma separated list of other sections in the
-same configuration file. 
+same configuration file. Each comma separated value represents a \gls{testset}.
 
-Each test section \textit{must} define the following keys
+
+\subsection{The test sections}
+\label{sec:test_sec}
+
+
+\paragraph*{Required options}
 
 \begin{description}
     \item[type] The type of test to be run, this can be either: \verb@scp@,
         \verb@sftp@ or \verb@rsync@.
     \item[host] The host the test should run against.
+    \item[arguments] A comma separated list of sections that represents a set
+        of arguments to be run on the command. See section
+        \ref{sec:argument_sec}.
+\end{description}
+
+\paragraph*{Optional options}
+
+\begin{description}
+    \item[username] The username used when connecting to the remote site. If
+        this argument is not used, no username is used in the function and it
+        will \textit{probably} default to using the same username as the one
+        running the script.
+\end{description}
+
+
+\subsection{The argument sections}
+\label{sec:argument_sec}
+
+\paragraph*{Optional options}
+
+\begin{description}
+    \item[encryption]   Sets the encryption type used when transmitting data.
+        Usually \verb@3des@ or \verb@blowfish@ are valid arguments.
+    \item[compression]  Whether or not compression should be used when
+        transmitting data. Valid values are \verb@yes@ and \verb@no@.
+    \item[compression\_level]   Sets the level of compression used when
+        transmitting the files. Allowed values are integers 1-9.
 \end{description}

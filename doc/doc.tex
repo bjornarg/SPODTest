@@ -54,6 +54,12 @@
 \newacronym{http}{HTTP}{Hypertext Transfer Protocol}
 \newacronym{ssl}{SSL}{Secure Socket Layer}
 \newacronym{tls}{TLS}{Transport Layer Security}
+\newglossaryentry{testset}{name={test set}, 
+    description={A specific command with a set of arguments and file sets that
+    combines into separate \gls{testcase}s}}
+\newglossaryentry{testcase}{name={test case}, 
+    description={A specific command with a specific set of arguments run on a
+    specific set of files}}
 
 \title{SPODTest Documentation}
 \author{Bjørnar Grip Fjær}
@@ -75,5 +81,7 @@
 
 \newpage
 \input{references}
+
+\printglossaries
 
 \end{document}
