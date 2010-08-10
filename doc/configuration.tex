@@ -46,3 +46,43 @@ same configuration file. Each comma separated value represents a \gls{testset}.
     \item[compression\_level]   Sets the level of compression used when
         transmitting the files. Allowed values are integers 1-9.
 \end{description}
+
+\newpage
+\subsection{Example}
+
+Below is an example of a \verb@spodconf.cfg@ file. This is set up for snehvit,
+transfering data to \verb@titan.uio.no@. It will test the commands \verb@rsync@
+and \verb@scp@ on the \verb@smalldata@ dataset. It will run one test with
+compression enabled, and one with compression enabled and blowfish encryption
+for each of the commands. 
+
+\begin{verbatim}
+[spod]
+name=snehvit
+host=snehvit.ntnu.no
+tests=test1,test2
+
+[test1]
+type=rsync
+arguments=args1,args2
+host=titan.uio.no
+target_folder=/home/test/datadump
+fetch=False
+files=/home/test/datasets/smalldata
+
+[test2]
+type=scp
+arguments=args1,args2
+host=titan.uio.no
+target_folder=/home/test/datadump
+fetch=False
+files=/home/test/datasets/smalldata
+
+[args1]
+compression=yes
+
+[args2]
+encryption=blowfish
+compression=yes
+
+\end{verbatim}
