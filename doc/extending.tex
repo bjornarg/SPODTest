@@ -1,0 +1,9 @@
+\section{Extending SPODTest}
+
+\gls{spodtest} can be extended to include tests for more commands if required.
+This is done by subclassing the \verb@testers.base.CommandBuilder@ class. These
+subclasses define the command itself, how it handles arguments, and can build
+any necessary extra files needed for sending the data.
+
+See \verb@testers.sftp@ for a well documented example of how to create such a
+class.
