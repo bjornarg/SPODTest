@@ -1,23 +1,47 @@
-import ConfigParser
 import sys
+import os
 import logging
+import datetime
+import ConfigParser
+
 from testers.rsync import RSyncCommand
 from testers.scp import SCPCommand
 from testers.sftp import SFTPCommand
 import xmlpacker
+
 
 command_types = {
     'scp': SCPCommand,
     'sftp': SFTPCommand,
     'rsync': RSyncCommand,
 }
+def log_setup(log_level, log_file):
+    """Sets up basic configuration for logging. """
+    LOG_LEVELS = {
+        'debug': logging.DEBUG,
+        'info': logging.INFO,
+        'warning': logging.WARNING,
+        'error': logging.ERROR,
+        'critical': logging.CRITICAL
+    }
+    LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
+
+    log_level = LOG_LEVELS.get(log_level, logging.WARNING)
+    log_file = datetime.datetime.strftime(datetime.datetime.now(), log_file)
+    logging.basicConfig(level=log_level,
+        format=LOG_FORMAT,
+        datefmt="%Y-%m-%d %H:%M:%S",
+        filename=log_file)
 
 def main():
+    SCRIPT_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))
     conf = ConfigParser.SafeConfigParser()
-    conf.read('spodconf.cfg')
+    conf.read(os.path.join(SCRIPT_PATH, 'spodconf.cfg'))
+
     try:
         spod = conf.items('spod')
     except ConfigParser.NoSectionError, nose:
+        
         sys.stderr.write(("Missing section \"spod\" in configuration file. "
                     "Cannot proceed."))
         sys.exit(2)
@@ -27,30 +51,49 @@ def main():
         sys.stderr.write(("Missing option \"tests\" in section \"spod\" "
                     "in configuration file. Cannot proceed."))
         sys.exit(2)
+    # Get logging information
+    try:
+        log_level = conf.get('spod', 'loglevel')
+    except ConfigParser.NoOptionError, nope:
+        log_level = 'warning'
+    try:
+        log_file = conf.get('spod', 'logfile')
+    except ConfigParser.NoOptionError, nope:
+        log_file = os.path.join(SCRIPT_PATH, "spodtest.%Y-%m-%d.log")
+
+    log_setup(log_level, log_file)
+
+    xml_file = None
+    try:
+        xml_file = conf.get('spod', 'xmldoc')
+    except ConfigParser.NoOptionError, nope:
+        logging.warning(("Missing XML document file location. "
+            "XML going to stdout."))
+
     testsets = testsets.split(",")
     ts_list = []
     build_list = []
-    for i, testset in enumerate(testsets):
+    for testset in testsets:
         try:
             testcase = conf.items(testset.strip())
         except ConfigParser.NoSectionError, nose:
-            sys.stderr.write(("Missing section \"%s\" defines as a test set.") %
+            sys.stderr.write(("Missing section \"%s\" defined as a test set.") %
                         testset.strip())
             continue
         testcase = dict(testcase)
         build_list.append(command_types[testcase['type']](conf, testset))
-        ts_list.append(build_list[i].build_test_set())
+        ts_list.append(build_list[-1].build_test_set())
     xmldoc = xmlpacker.XMLDoc()
     for ts in ts_list:
         ts.run()
         for tc in ts.get_test_cases():
             xmldoc.add_testcase(tc)
-    xmlf = open('/tmp/xmldoc.xml', "w")
-    xmlf.write(xmldoc.get_xml())
-    xmlf.close()
-
-
-
+    if xml_file is None:
+        sys.stdout.write(xmldoc.get_xml())
+    else:
+        xmlf = open(xml_file, "w")
+        xmlf.write(xmldoc.get_xml())
+        xmlf.close()
 
 
 if __name__=='__main__':
