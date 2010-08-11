@@ -3,14 +3,35 @@
 formatted configuration file. The configuration file defines what tests are
 run.
 
-The tests are defined by the \verb@tests@ parameter in the \verb@spod@ section.
-The value of this key should be a comma separated list of other sections in the
-same configuration file. Each comma separated value represents a \gls{testset}.
+\subsection{The spod section}
+This is the main section that defines where to find test setup information. 
+
+\paragraph*{Required options}
+
+\begin{description}
+    \item[tests] The tests that should be run when \verb@spodtest.py@ is
+        executed. This should be a comma separated list of other sections in
+        the configuration file, with the keys described in section
+        \ref{sec:test_sec}.
+\end{description}
+
+\paragraph*{Optional options}
+
+\begin{description}
+    \item[loglevel] The logging level for the script. This can be
+        \textit{debug, info, warning, error} or \textit{critical}. Defaults to
+        \textit{warning}. Recommended setting is \textit{warning}.
+    \item[logfile] The log file to log to. This string will be formatted with
+        the Python
+        \href{http://docs.python.org/library/datetime.html#strftime-and-strptime-behavior}{datetime module}. 
+        Defaults to \textit{spodtest.\%Y-\%m-\%d.log}.
+\end{description}
 
 
 \subsection{The test sections}
 \label{sec:test_sec}
 
+These sections will define each separate test.
 
 \paragraph*{Required options}
 
@@ -21,6 +42,8 @@ same configuration file. Each comma separated value represents a \gls{testset}.
     \item[arguments] A comma separated list of sections that represents a set
         of arguments to be run on the command. See section
         \ref{sec:argument_sec}.
+    \item[target\_folder] The folder to transfer files to on \textbf{host}.
+    \item[files] The files to transfer.
 \end{description}
 
 \paragraph*{Optional options}
@@ -36,6 +59,9 @@ same configuration file. Each comma separated value represents a \gls{testset}.
 \subsection{The argument sections}
 \label{sec:argument_sec}
 
+There are no required options for argument sections. If no options are given,
+it will simply use the default values for each.
+
 \paragraph*{Optional options}
 
 \begin{description}
@@ -50,16 +76,19 @@ same configuration file. Each comma separated value represents a \gls{testset}.
 \newpage
 \subsection{Example}
 
-Below is an example of a \verb@spodconf.cfg@ file. This is set up for snehvit,
-transfering data to \verb@titan.uio.no@. It will test the commands \verb@rsync@
-and \verb@scp@ on the \verb@smalldata@ dataset. It will run one test with
-compression enabled, and one with compression enabled and blowfish encryption
-for each of the commands. 
+Below is an example of a \verb@spodconf.cfg@ file. This is set up for
+transferring data to \verb@titan.uio.no@. It will test the commands
+\verb@rsync@ and \verb@scp@ on the \verb@smalldata@ dataset. It will run one
+test with compression enabled, and one with compression enabled and blowfish
+encryption for each of the commands. 
+
+It will log to the file \verb@/var/log/spod.YYYY-MM-DD.log@ with a log level of
+\verb@warning@.
 
 \begin{verbatim}
 [spod]
-name=snehvit
-host=snehvit.ntnu.no
+logfile=/var/log/spod.%Y-%m-%d.log
+loglevel=warning
 tests=test1,test2
 
 [test1]
@@ -67,7 +96,6 @@ type=rsync
 arguments=args1,args2
 host=titan.uio.no
 target_folder=/home/test/datadump
-fetch=False
 files=/home/test/datasets/smalldata
 
 [test2]
@@ -75,7 +103,6 @@ type=scp
 arguments=args1,args2
 host=titan.uio.no
 target_folder=/home/test/datadump
-fetch=False
 files=/home/test/datasets/smalldata
 
 [args1]
