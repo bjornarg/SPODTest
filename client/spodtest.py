@@ -4,6 +4,8 @@ import logging
 import datetime
 import ConfigParser
 
+from lxml import etree
+
 from testers.rsync import RSyncCommand
 from testers.scp import SCPCommand
 from testers.sftp import SFTPCommand
@@ -83,7 +85,13 @@ def main():
         testcase = dict(testcase)
         build_list.append(command_types[testcase['type']](conf, testset))
         ts_list.append(build_list[-1].build_test_set())
-    xmldoc = xmlpacker.XMLDoc()
+    if xml_file is not None and os.path.exists(xml_file):
+        xmlf = open(xml_file, "r")
+        root = etree.fromstring(xmlf.read())
+        xmlf.close()
+        xmldoc = xmlpacker.XMLDoc(root)
+    else:
+        xmldoc = xmlpacker.XMLDoc()
     for ts in ts_list:
         ts.run()
         for tc in ts.get_test_cases():
