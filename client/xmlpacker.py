@@ -3,9 +3,20 @@ import logging
 from utils import date_to_rfc3339
 
 class XMLDoc(object):
-    def __init__(self):
-       self.root = etree.Element("spodtest")
+    """Class for handling XML packing of SPODTest data. """
+    def __init__(self, root=None):
+        """Initializes the root of the XML document. """
+        if root is None:
+            self.root = etree.Element("spodtest")
+        else:
+            self.root = root
     def add_testcase(self, testcase):
+        """Adds a test case to the document.
+
+        @param testcase: The test case to be added
+        @type testcase: L{TestCase}
+
+        """
         logging.debug(("Command: %s "
                         "Time used: %s "
                         "Size transferred: %s "
@@ -28,6 +39,11 @@ class XMLDoc(object):
             date=date_to_rfc3339(testcase.timer.start_time),
             ))
     def get_xml(self):
+        """Gets the document as a string.
+
+        @return: String containing the XML of the document.
+
+        """
         return etree.tostring(
             self.root, 
             pretty_print=True, 
