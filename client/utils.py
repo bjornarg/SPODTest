@@ -5,7 +5,7 @@ import time
 import re
 
 def date_to_rfc3339(date):
-    """ Converts a datetime.datetime object or time.time() to RFC3339 string. 
+    """Converts a datetime.datetime object or time.time() to RFC3339 string. 
     
     """
     if isinstance(date, float) or isinstance(date, int):
@@ -25,11 +25,13 @@ def date_to_rfc3339(date):
     zone_prefix = "-"
     if timedelta >= 0:
         zone_prefix = "+"
-    offset = "%s%02d:%02d" % (zone_prefix, abs(timedelta/3600), abs(timedelta%3600/60))
+    offset = "%s%02d:%02d" % (zone_prefix, 
+        abs(timedelta/3600), 
+        abs(timedelta%3600/60))
     return "%s%s" % (date.strftime(date_str), offset)
 
 def rfc3339_to_date(date_str):
-    """ Converts a string to datetime.datetime object if string is a valid
+    """Converts a string to datetime.datetime object if string is a valid
     RFC3339 date.
 
     Returns False for any string that is not valid RFC3339.
