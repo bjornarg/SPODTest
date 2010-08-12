@@ -1,8 +1,6 @@
 import timer
 import subprocess
 import os
-import StringIO
-import re
 import logging
 import shlex
 
@@ -129,50 +127,60 @@ class TestSet(object):
 
         """
         for test_case in self.test_cases:
-            test_case.run()
+            try:
+                test_case.run()
+            except IllegalReturnValueError, irve:
+                logging.error(irve)
 
 class CommandBuilder(object):
     """Abstract class defining useful stuff for creating a test set from a
     certain command.
 
     """
-    def __init__(self, name, base_cmd, cmd_format, cfgname, config, 
-            common_args=[], test_args=None, file_format=None):
+    def __init__(self, cmdname, config, cfgname):
         """Initializes a command builder and sets some common class arguments.
 
         @param name: Name of this command type
         @type name: string
-        @param base_cmd: The shell command to be executed
-        @type base_cmd: string
-        @param cmd_format: Format of the string to be executed.
-        @type cmd_format: string
-        @param cfgname: Name of the current testset in the config.
-        @type cfgname: string
         @param config: Configuration object.
         @type config: U{ConfigParser.SafeConfigParser<http://docs.python.org
                       /library/configparser.html#safeconfigparser-objects>}
-        @param common_args: Common arguments passed to all instances 
-                            of this command
-        @type common_args: list
-        @param test_args: List of test arguments run for this command
-        @type test_args: list of L{Args}
-        @param file_format: Method of formatting files for this command.
-        @type file_format: string
 
         """
-        self.cfgname = cfgname
-        self.config = config
-        self.name = name
-        self.base_cmd = base_cmd
-        self.cmd_format = cmd_format
-        self.common_args = common_args
-        if test_args is None:
-            self.test_args = []
+        self.name = cmdname
+        # Required parameters
+        self.host = config.get(cfgname, 'host')
+        self.target_folder = config.get(cfgname, 'target_folder')
+        self.arguments = config.get(cfgname, 'arguments')
+        # Optional parameters
+        self.username = None
+        if config.has_option(cfgname, 'username'):
+            self.username = config.get(cfgname, 'username')
+        if self.username is not None:
+            self.target = "%s@%s" % (self.username, self.host)
         else:
-            self.test_args = test_args
-        self.file_format = file_format
-        self.commands = []
+            self.target = self.host
+        # Argument parameters
+        self.arguments = []
+        args = config.get(cfgname, 'arguments').split(",")
+        for arg in args:
+            enc = None
+            comp = None
+            compl = None
+            if config.has_option(arg, 'encryption'):
+                enc = config.get(arg, 'encryption')
+            if config.has_option(arg, 'compression'):
+                comp = config.get(arg, 'compression')
+            if config.has_option(arg, 'compression_level'):
+                try:
+                    compl = int(config.get(arg, 'compression_level'))
+                except ValueError, ve:
+                    pass
+            self.arguments.append({'enc': enc, 'comp': comp, 'compl': compl})
+
         self.files = []
+        self.test_args = []
+        self.commands = []
         files = config.get(cfgname, 'files').split(",")
         for f in files:
             self.files.append(self.build_file(f.strip()))
@@ -200,13 +208,14 @@ class CommandBuilder(object):
                 'base_command': self.base_cmd,
                 'common_args': " ".join(self.common_args),
                 'test_args': " ".join(test_arg.get_args()),
-                'file_args': self.file_format,
+                'target': self.target,
+                'target_folder': self.target_folder,
             }
-            cmd = self.cmd_format % formatdata
-            self.commands.append(Command(command=cmd, 
+            self.commands.append(Command(command=self.cmd_format, 
                                     command_name=self.name, 
                                     args=test_arg,
-                                    builder=self))
+                                    builder=self,
+                                    formatdata=formatdata))
     def build_test_set(self):
         """Builds a test set from the list of commands.
 
@@ -228,7 +237,7 @@ class Command(object):
     """Object representing a command to be run.
 
     """
-    def __init__(self, command, command_name, args, builder):
+    def __init__(self, command, command_name, args, builder, formatdata):
         """Initializes the command with the command itself and list of 
         arguments used for this command.
 
@@ -244,6 +253,7 @@ class Command(object):
         self.command_name = command_name
         self.args = args
         self.builder = builder
+        self.formatdata = formatdata
     def __str__(self):
         """Returns a string representation of L{Command}.
 
@@ -261,11 +271,22 @@ class Command(object):
         @return: string
 
         """
+        formatdata = dict(self.formatdata) # Creating a copy
         if isinstance(f, dict):
-            return self.command % f
-        if isinstance(f, FileObject):
-            return self.command % f.get_dict()
-        return self.command
+            formatdata.update(f)
+        else:
+            if isinstance(f, FileObject):
+                formatdata.update(f.get_dict())
+            else:
+                # We've not been passed a specific file, so we'll just fill 
+                # in the file data with unusable stuff.
+                formatdata.update({
+                    'filename': '<filename>',
+                    'filelocation': '<filelocation>',
+                    'filedir': '<filedir>',
+                    'usagefile': '<usagefile>',
+                })
+        return self.command % formatdata
     def get_command_list(self, f=None):
         """Gets the command in list form, as subprocess prefers this.
 
@@ -291,25 +312,8 @@ class Command(object):
 class FileObject(object):
     """Class representing a file and other necessary data about it.
     
-    >>> import sys
-    >>> import os
-    >>> filepath = os.path.abspath(sys.argv[0])
-    >>> fo = FileObject(name=filepath)
-    >>> foo = FileObject(name=fo.get_dir(), size=30, num_files=2)
-    >>> fo.is_dir()
-    False
-    >>> foo.is_dir()
-    True
-    >>> fo.get_num_files()
-    1
-    >>> foo.get_num_files()
-    2
-    >>> foo.get_size()
-    30
-
     """
-    def __init__(self, name, size=None, num_files=None, usage_file=None, 
-                    fs_name=None):
+    def __init__(self, name, usage_file=None, fs_name=None):
         self.abspath = os.path.abspath(name)
         if os.path.isdir(self.abspath):
             self.name = ''
@@ -317,10 +321,11 @@ class FileObject(object):
         else:
             self.name = os.path.basename(self.abspath)
             self.directory = os.path.dirname(self.abspath)
-        self.size = size
-        self.num_files = num_files
+        self.size = None
+        self.num_files = None
         self.usage_file = usage_file
         self.fs_name = fs_name
+        self.filelist = []
     def get_path(self):
         """Gets location of file.
 
@@ -383,12 +388,12 @@ class FileObject(object):
         """
         if self.size is not None:
             return self.size
-        fi = self.get_file_info(self.abspath)
-        self.size = fi['size']
-        if self.num_files is None:
-            self.num_files = fi['num']
+        self.get_file_info()
         return self.size
     def set_usage_file(self, f):
+        """Gets the usage file defined for this set.
+
+        """
         self.usage_file = f
     def get_dict(self):
         """Gets a dictionary representation of the file.
@@ -404,15 +409,32 @@ class FileObject(object):
                         'usagefile': self.usage_file}
         return retdict
     def is_dir(self):
+        """Checks whether this FileObject represents a directory.
+
+        @return: bool
+
+        """
         return os.path.isdir(self.abspath)
     def get_num_files(self):
+        """Gets the number of files this FileObject represents.
+
+        See L{FileObject.get_file_info} for documentation on how information 
+        is gathered.
+
+        """
         if self.num_files is not None:
             return self.num_files
-        fi = self.get_file_info(self.abspath)
-        if self.size is None:
-            self.size = fi['size']
-        self.num_files = fi['num']
+        self.get_file_info()
         return self.num_files
+    def get_filelist(self):
+        """Gets a list of files represented by this FileObject.
+
+        @return: list of paths to files represented by self.
+
+        """
+        if len(self.filelist) == 0:
+            self.get_file_info()
+        return self.filelist
     def get_size_string(self):
         total_size = float(self.get_size())
         if total_size > 1024*1024*1024:
@@ -423,27 +445,30 @@ class FileObject(object):
             return "%.2fkB" % round(total_size/(1024*1024), 2)
         else:
             return "%.2fB" % round(total_size, 2)
-    @staticmethod
-    def get_file_info(filepath):
+
+    def get_file_info(self):
         """Gets the size of a file/directory and the number of files.
 
-        The number of files will always be 1 if I{filepath} points to a file.
+        The number of files will always be B{1} if self represents a file, 
+        otherwise the number will be the number of files in the directory.
 
-        @param filepath: Path to a file or directory
-        @type filepath: string
-        @return: dict with the keys I{size} and I{num}, containing the size of 
-                 file or directory, and the number of files.
+        Will ignore any file named C{fs_name}.
 
         """
-        if not os.path.isdir(filepath):
-            return {'size': os.path.getsize(filepath), 'num': 1}
+        if not self.is_dir():
+            self.filelist.append(self.abspath)
+            self.size = os.path.getsize(self.abspath)
+            self.num = 1
         size = 0
         num = 0
-        for (path, dirs, files) in os.walk(filepath):
-            size += sum(os.path.getsize(os.path.join(path, f)) for f in files)
-            num += len(files)
-        return {'size': size, 'num': num}
-        
+        for (path, dirs, files) in os.walk(self.abspath):
+            for f in files:
+                if f != "fs_name":
+                    self.filelist.append(os.path.join(path, f))
+                    size += os.path.getsize(os.path.join(path, f))
+                    num += 1
+        self.size = size
+        self.num_files = num
 
 
 class Args(object):
