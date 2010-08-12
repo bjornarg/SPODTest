@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-#            tests.py is part of SPODTest.
+#            doctests.py is part of SPODTest.
 #
 # All of SPODTest is free software: you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
