@@ -7,3 +7,50 @@ any necessary extra files needed for sending the data.
 
 See \verb@testers.sftp@ for a well documented example of how to create such a
 class.
+
+\subsection{Class variables}
+
+There are certain variables that should be set when a \verb@CommandBuilder@ sub
+class is created. These are:
+
+\begin{description}
+    \item[base\_cmd] A string of the command to be executed.
+    \item[test\_args] A list of \verb@Args@ class instances representing each
+        test case for the command.
+    \item[common\_args] A list of arguments (strings) that should be passed to
+        every run of the command. \textit{This can be parameters that sets the
+        program to recursive mode, batch mode or similar that are necessary for
+        the program to execute properly without requiring input.}
+    \item[cmd\_format] A string that represents how the command should be
+        built. This string will be
+        \href{http://docs.python.org/library/stdtypes.html#string-formatting}{string
+        formatted} with a dictionary containing the values described in section
+        \ref{sec:format_dict}.
+\end{description}
+
+\subsection{Format dictionary}
+\label{sec:format_dict}
+
+The format dictionary will contain the following key/value pairs:
+
+\begin{description}
+    \item[base\_cmd] The variable \verb@self.base_cmd@ set on creation.
+    \item[common\_args] A concatenation of the strings set in
+        \verb@self.common_args@.
+    \item[test\_args] A concatenation of the string values set in each of the
+        \verb@test_args@.
+    \item[target] Target is either the host, or a combination of host and
+        user name (if username is set in the test section) as
+        \verb"username@host".
+    \item[target\_folder] The \verb@target_folder@ set in the test section in
+        the configuration file.
+    \item[filename] The name of the file (empty string if the file is a
+        directory).
+    \item[filedir] Directory the file is in. Equivalent to
+        \textbf{filelocation}  if the file is a directory.
+    \item[filelocation] Absolute path to the file. Equivalent to
+        \textbf{filedir} if the file is a directory.
+    \item[usagefile] If any file is set as the usage file through
+        \verb@FileObject.set_usage_file()@, this will be the variable. See
+        \verb@testers.sftp@ for an example where usage file is used.
+\end{description}

@@ -6,3 +6,12 @@ files present.
 Data sets should \textit{should} be named. This is done by placing a text file
 in the root of the data set folder named \verb@fs_name@. This should contain
 only the name of the file set.
+
+The \verb@fs_name@ file will not be counted in the number of files for the data
+set. It \textit{will} however be sent, creating a slight inconsistency between
+the data presented and the data transferred. This is due to \verb@scp@ not
+being able to exclude certain files from transfer, so the data set could not be
+properly transferred through a single command using \verb@scp@, while dropping
+\verb@fs_name@ from the transferred files. Since most data sets are likely to
+either contain a large number of files, or large files, the extra data sent
+due to \verb@fs_name@ is considered to be negligible.
