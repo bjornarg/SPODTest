@@ -21,10 +21,15 @@ This is the main section that defines where to find test setup information.
     \item[loglevel] The logging level for the script. This can be
         \textit{debug, info, warning, error} or \textit{critical}. Defaults to
         \textit{warning}. Recommended setting is \textit{warning}.
-    \item[logfile] The log file to log to. This string will be formatted with
-        the Python
+    \item[logfile] Absolute path to the log file to log to. This string will be
+        formatted with the Python
         \href{http://docs.python.org/library/datetime.html#strftime-and-strptime-behavior}{datetime module}. 
         Defaults to \textit{spodtest.\%Y-\%m-\%d.log}.
+    \item[xmldoc] Absolute path to the location where the \gls{xml} document
+        should be saved. If the file exists, it \textit{must} be a
+        \gls{spodtest} \gls{xml} document, and new data from the current run
+        will be added to the document. If this is \textit{not} set, the
+        \gls{xml} will be dumped to \texttt{stdout}.
 \end{description}
 
 
@@ -83,13 +88,15 @@ test with compression enabled, and one with compression enabled and blowfish
 encryption for each of the commands. 
 
 It will log to the file \verb@/var/log/spod.YYYY-MM-DD.log@ with a log level of
-\verb@warning@.
+\verb@warning@. The resulting \gls{xml} will be saved in
+\verb@/tmp/spodtest.xml@. 
 
 \begin{verbatim}
 [spod]
 logfile=/var/log/spod.%Y-%m-%d.log
 loglevel=warning
 tests=test1,test2
+xmldoc=/tmp/spodtest.xml
 
 [test1]
 type=rsync
