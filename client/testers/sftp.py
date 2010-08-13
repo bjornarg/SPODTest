@@ -52,6 +52,10 @@ class SFTPCommand(CommandBuilder):
         """
         super(SFTPCommand, self).__init__('SFTP', config, name)
         self.base_cmd = 'sftp'
+        # self.arguments now contains a list of dictionaries on the form
+        # {'enc': <value>, 'comp': <value>, 'compl': <value>}
+        # where each dictionary represents the arguments that should be passed 
+        # to a single test case. 
         legal_compression = ('yes', 'no',)
         legal_encryption = ('blowfish', '3des')
         for arg in self.arguments:
@@ -69,8 +73,8 @@ class SFTPCommand(CommandBuilder):
             self.test_args.append(Args(arglist, enc, comp, compl))
 
 
-        self.program = '/usr/bin/sftp'
-        self.common_args = ['-b',]
+        self.common_args = ['-b',] # Arguments that should be passed to every
+                                   # run of the command.
         self.cmd_format = ("%(base_command)s %(test_args)s "
                         "%(common_args)s %(usagefile)s %(target)s")
     def build_file(self, f):

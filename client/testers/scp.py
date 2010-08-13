@@ -44,7 +44,6 @@ class SCPCommand(CommandBuilder):
             self.test_args.append(Args(arglist, enc, comp, compl))
 
 
-        self.program = '/usr/bin/scp'
         self.common_args = ['-B', '-r']
         self.cmd_format = ("%(base_command)s %(common_args)s "
                         "%(test_args)s %(filelocation)s "

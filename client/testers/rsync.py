@@ -43,7 +43,6 @@ class RSyncCommand(CommandBuilder):
                         arglist.append('--compress-level=%d' % compl)
             self.test_args.append(Args(arglist, enc, comp, compl))
 
-        self.program = '/usr/bin/rsync'
         self.common_args = ['-r', '-W']
         self.cmd_format = ("%(base_command)s %(common_args)s "
                         "%(test_args)s %(filelocation)s "
